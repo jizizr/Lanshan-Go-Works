@@ -40,7 +40,7 @@ func (p *PetersonLock) Unlock(i int) {
 }
 
 func main() {
-	n := 20 // 假设有5个goroutine
+	n := 20 // 假设有20个goroutine
 	petersonLock := NewPetersonLock(n)
 
 	for i := 0; i < n; i++ {
@@ -55,5 +55,5 @@ func main() {
 	}
 
 	// 等待一段时间以观察输出
-	time.Sleep(50 * time.Second)
+	time.Sleep(5 * time.Second)
 }
