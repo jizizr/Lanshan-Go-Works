@@ -1,5 +1,5 @@
-- `PetersonLock`是一个结构体，表示分层锁。
-- 它包含两个切片：`level`和`waiting`。level表示线程的等待级别，waiting模拟了一个忙等待队列。
+`PetersonLock`是一个结构体，表示分层锁。
+它包含两个切片：`level`和`waiting`。level表示线程的等待级别，waiting模拟了一个忙等待队列。
 
 ### 锁的工作原理
 
