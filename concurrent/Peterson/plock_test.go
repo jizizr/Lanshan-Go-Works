@@ -1,30 +1,29 @@
 package plock
 
 import (
-	"fmt"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
+var a = 0
+
 func TestPLock(t *testing.T) {
-	numThreads := 100
+	numThreads := 6
 	var wg sync.WaitGroup
 	lock := NewPetersonLock(numThreads)
-
+	wg.Add(numThreads)
 	for i := 0; i < numThreads; i++ {
-		wg.Add(1)
-		go func(id int) {
+		go func(i int) {
 			defer wg.Done()
-
-			// fmt.Printf("进程 %d 正在尝试进入临界区...\n", id)
-			lock.Lock(id)
-			fmt.Printf("进程 %d 已进入临界区.\n", id)
-
-			// 模拟临界区操作
-			lock.Unlock(id)
-			fmt.Printf("进程 %d 已退出临界区.\n", id)
+			for j := 0; j < 100000; j++ {
+				lock.Lock(i)
+				a++
+				lock.Unlock(i)
+			}
 		}(i)
 	}
-
 	wg.Wait()
+	assert.Equal(t, 600000, a)
 }
