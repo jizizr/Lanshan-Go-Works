@@ -44,4 +44,53 @@ func TestSyncMap(t *testing.T) {
 	_, err = m.Get(4, 1*time.Second)
 	assert.Error(t, err)
 	t.Log("测试超时 Get 成功")
+	// 测试并发 Put 操作是否会尝试关闭已经关闭的通道
+	t.Run("Concurrent Put Same Key", func(t *testing.T) {
+		key := 5
+		value := "concurrent test"
+
+		// 启动多个协程进行并发的 Put 操作
+		const numGoroutines = 10
+		for i := 0; i < numGoroutines; i++ {
+			go func() {
+				m.Put(key, value)
+			}()
+		}
+
+		// 等待一段时间以确保所有 Put 操作都有机会执行
+		time.Sleep(100 * time.Millisecond)
+
+		// 然后尝试获取该键的值
+		retrievedValue, err := m.Get(key, 1*time.Second)
+
+		// 验证获取的值和期望的值是否相同，以及没有发生错误
+		assert.NoError(t, err)
+		assert.Equal(t, value, retrievedValue)
+		t.Log("并发 Put 同一个键测试成功")
+	})
+	//测试并发Get
+	t.Run("Concurrent Get", func(t *testing.T) {
+		key := 7
+		value := "concurrent test"
+		m.Put(key, value)
+
+		// 启动多个协程进行并发的 Get 操作
+		const numGoroutines = 3
+		for i := 0; i < numGoroutines; i++ {
+			go func() {
+				m.Get(key, 1*time.Second)
+			}()
+		}
+
+		// 等待一段时间以确保所有 Get 操作都有机会执行
+		time.Sleep(3 * time.Second)
+
+		// 然后尝试获取该键的值
+		retrievedValue, err := m.Get(key, 1*time.Second)
+
+		// 验证获取的值和期望的值是否相同，以及没有发生错误
+		assert.NoError(t, err)
+		assert.Equal(t, value, retrievedValue)
+		t.Log("并发 Get 测试成功")
+	})
 }
