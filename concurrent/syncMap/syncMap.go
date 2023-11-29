@@ -54,16 +54,24 @@ func (m *SyncMap) Get(k int, maxWaitingTime time.Duration) (interface{}, error) 
 // Put 方法将键 k 的值设置为 v。如果该键对应的 entry 已经存在，
 // 它更新该 entry 的值并关闭 ready 通道，通知等待该键的所有 Get 操作。
 func (m *SyncMap) Put(k int, v interface{}) {
-	m.mu.Lock()
-	ent, exists := m.data[k]
-	if !exists {
-		ent = newEntry(v)
-		m.data[k] = ent
-		m.mu.Unlock()
-		close(ent.ready)
-		return
-	}
-	ent.value = v
-	m.mu.Unlock()
-	close(ent.ready)
+    m.mu.Lock()
+    defer m.mu.Unlock()
+
+    ent, exists := m.data[k]
+    if !exists {
+        ent = newEntry(v)
+        m.data[k] = ent
+    } else {
+        // 如果 entry 已经存在，我们先更新值
+        ent.value = v
+    }
+
+    // 检查 ready 通道是否已经关闭
+    select {
+    case <-ent.ready:
+        return
+    default:
+        close(ent.ready)
+    }
 }
+
