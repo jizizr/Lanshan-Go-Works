@@ -6,168 +6,153 @@ import (
 	"time"
 )
 
-const noOfPhilosophers = 5
+var noOfPhilosophers = 5
 
-// SyncChannel is used for signaling.
-type SyncChannel struct {
-	cond *sync.Cond
+//lockForks 尝试同时锁两个互斥锁
+func lockForks(a, b *sync.Mutex) {
+	for {
+		a.Lock()
+		if b.TryLock() {
+			return
+		}
+		a.Unlock()
+		a, b = b, a
+	}
 }
 
-func NewSyncChannel() *SyncChannel {
-	return &SyncChannel{cond: sync.NewCond(&sync.Mutex{})}
+// 信号量实现
+type semaphore struct {
+	ch chan struct{}
 }
 
-func (sc *SyncChannel) Wait() {
-	sc.cond.L.Lock()
-	sc.cond.Wait()
-	sc.cond.L.Unlock()
+func newSemaphore() *semaphore {
+	return &semaphore{ch: make(chan struct{}, 1)} // 容量为1的信号量
 }
 
-func (sc *SyncChannel) NotifyAll() {
-	sc.cond.Broadcast()
+func (s *semaphore) wait() {
+	s.ch <- struct{}{} // 获取信号量，如果信号量已满，这里会阻塞
 }
 
-type TableSetup struct {
-	done    bool
-	channel *SyncChannel
+func (s *semaphore) signal() {
+	<-s.ch // 释放信号量，允许其他协程获取
 }
 
-type Fork struct {
+type tableSetup struct {
+	done bool //atomic
+}
+
+func NewTableSetup() *tableSetup {
+	return &tableSetup{done: false}
+}
+
+type fork struct {
 	id      int
 	owner   int
-	dirty   bool
-	mutex   sync.Mutex
-	channel *SyncChannel
+	Dirty   bool
+	m       *sync.Mutex
+	sem     *semaphore
 }
 
-func NewFork(forkId, ownerId int) *Fork {
-	return &Fork{id: forkId, owner: ownerId, dirty: true, channel: NewSyncChannel()}
+func NewFork(id, owner int) *fork {
+	return &fork{id: id, owner: owner, Dirty: true, m: &sync.Mutex{}, sem: newSemaphore()}
 }
 
-func (f *Fork) request(ownerId int) {
-	for f.owner != ownerId {
-		if f.dirty {
-			f.mutex.Lock()
+func (f *fork) requests(ownerId int) {
+	f.sem.wait() // 使用信号量等待
+	defer f.sem.signal() // 完成后释放信号量
 
-			f.dirty = false
+	for ownerId != f.owner {
+		if f.Dirty {
+			f.m.Lock()
+			f.Dirty = false
 			f.owner = ownerId
-
-			f.mutex.Unlock()
-		} else {
-			f.channel.Wait()
+			f.m.Unlock()
 		}
 	}
 }
 
-func (f *Fork) doneUsing() {
-	f.dirty = true
-	f.channel.NotifyAll()
+func (f *fork) done_using(ownerId int) {
+	f.Dirty = true
 }
 
-type Philosopher struct {
-	id        int
-	name      string
-	setup     *TableSetup
-	leftFork  *Fork
-	rightFork *Fork
+func (f *fork) getmutex() *sync.Mutex {
+	return f.m
 }
 
-func NewPhilosopher(id int, name string, setup *TableSetup, leftFork, rightFork *Fork) *Philosopher {
-	return &Philosopher{id: id, name: name, setup: setup, leftFork: leftFork, rightFork: rightFork}
+type philosopher struct {
+	id          int
+	table_setup *tableSetup
+	left_fork   *fork
+	right_fork  *fork
 }
 
-func (p *Philosopher) dine(wg *sync.WaitGroup) {
-	defer wg.Done()
+func NewPhilosopher(id int, table_setup *tableSetup, left_fork *fork, right_fork *fork) *philosopher {
+	return &philosopher{id: id, table_setup: table_setup, left_fork: left_fork, right_fork: right_fork}
+}
 
-	for !p.setup.done {
+func (p *philosopher) dine(setup *tableSetup) {
+	for !setup.done {
 		p.think()
 		p.eat()
 	}
 }
 
-func (p *Philosopher) print(text string) {
-	fmt.Printf("%-10s %s\n", p.name, text)
+func (p *philosopher) think() {
+	fmt.Println(p.id, "is thinking")
+	// time.Sleep(time.Second) // 增加思考时间
 }
 
-func (p *Philosopher) eat() {
-	p.leftFork.request(p.id)
-	p.rightFork.request(p.id)
-
-	// Lock both forks at the same time to avoid deadlock.
-	lock := sync.Mutex{}
-	lock.Lock()
-	p.leftFork.mutex.Lock()
-
-	p.rightFork.mutex.Lock()
-	lock.Unlock() // Unlock the temporary lock after both forks are locked
-
-	p.print("started eating")
-	time.Sleep(time.Second) // Simulate eating
-	p.print("finished eating")
-
-	p.leftFork.doneUsing()
-	p.rightFork.doneUsing()
-
-	p.leftFork.mutex.Unlock()
-	p.rightFork.mutex.Unlock()
+func (p *philosopher) eat() {
+	p.left_fork.requests(p.id)
+	p.right_fork.requests(p.id)
+	lockForks(p.left_fork.getmutex(), p.right_fork.getmutex())
+	defer p.left_fork.getmutex().Unlock()
+	defer p.right_fork.getmutex().Unlock()
+	fmt.Println(p.id, "is eating")
+	// time.Sleep(time.Second) // 增加就餐时间
+	fmt.Println(p.id, "is done eating")
+	p.left_fork.done_using(p.id)
+	p.right_fork.done_using(p.id)
 }
 
-func (p *Philosopher) think() {
-	p.print("is thinking")
-	time.Sleep(time.Second) // Simulate thinking
+type table struct {
+	setup       *tableSetup
+	forks       []*fork
+	philosopher []*philosopher
 }
 
-type Table struct {
-	setup  TableSetup
-	forks  []*Fork
-	philos []*Philosopher
-}
-
-func NewTable() *Table {
-	setup := TableSetup{done: false, channel: NewSyncChannel()}
-	forks := make([]*Fork, noOfPhilosophers)
-	philos := make([]*Philosopher, noOfPhilosophers)
-
+func NewTable() *table {
+	s := NewTableSetup()
+	f := make([]*fork, noOfPhilosophers)
+	p := make([]*philosopher, noOfPhilosophers)
 	for i := 0; i < noOfPhilosophers; i++ {
-		forks[i] = NewFork(i+1, (i+1)%noOfPhilosophers)
+		f[i] = NewFork(i, i)
 	}
-
 	for i := 0; i < noOfPhilosophers; i++ {
-		philos[i] = NewPhilosopher(i+1, fmt.Sprintf("Philosopher %d", i+1), &setup, forks[i], forks[(i+1)%noOfPhilosophers])
+		p[i] = NewPhilosopher(i, s, f[i], f[(i+1)%noOfPhilosophers])
 	}
+	return &table{setup: s, forks: f, philosopher: p}
+}
 
-	return &Table{
-		setup:  setup,
-		forks:  forks,
-		philos: philos,
+func (t *table) start() {
+	for i := 0; i < noOfPhilosophers; i++ {
+		go t.philosopher[i].dine(t.setup)
 	}
 }
 
-func (t *Table) start() {
-	var wg sync.WaitGroup
-	for _, ph := range t.philos {
-		wg.Add(1)
-		go ph.dine(&wg)
-	}
-
-	t.setup.channel.NotifyAll() // Let all philosophers start dining
-	wg.Wait()                   // Wait for all dining to be done
-}
-
-func (t *Table) stop() {
+func (t *table) stop() {
 	t.setup.done = true
 }
 
-func main() {
+func dine() {
 	fmt.Println("Dinner started!")
-
-	table := NewTable()
-	go func() {
-		time.Sleep(60 * time.Second) // Dine for 60 seconds
-		table.stop()
-	}()
-
-	table.start()
-
+	t := NewTable()
+	t.start()
+	time.Sleep(60 * time.Second)
+	t.stop()
 	fmt.Println("Dinner done!")
+}
+
+func main() {
+	dine()
 }
