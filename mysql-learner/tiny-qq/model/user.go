@@ -13,12 +13,12 @@ type ParamLoginUser struct {
 }
 
 type User struct {
-	UserID   int    `json:"user_id"`
+	UserID   int64  `json:"user_id"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 type UserToken struct {
-	UID   int    `json:"uid"`
+	UID   int64  `json:"uid"`
 	Token string `json:"token"`
 }

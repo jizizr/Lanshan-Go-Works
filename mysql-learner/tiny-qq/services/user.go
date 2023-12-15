@@ -19,7 +19,7 @@ func Register(ParamUser *model.ParamRegisterUser) error {
 	return mysql.AddUser(user)
 }
 
-func Login(ParamUser *model.ParamLoginUser) (int, string, error) {
+func Login(ParamUser *model.ParamLoginUser) (int64, string, error) {
 	if err := mysql.CheckUser(ParamUser.Username); !errors.Is(err, mysql.ErrorUserExist) {
 		if err != nil {
 			return -1, "", err

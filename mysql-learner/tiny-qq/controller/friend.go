@@ -78,3 +78,16 @@ func QueryFriendsList(c *gin.Context) {
 	}
 	RespSuccess(c, list)
 }
+
+// SearchFriend 搜索好友
+func SearchFriend(c *gin.Context) {
+	uid, _ := utils.GetUid(c)
+	username := c.Query("username")
+	list, err := services.SearchFriend(uid, username)
+	if err != nil {
+		RespFailed(c, CodeServiceBusy)
+		log.Println(err)
+		return
+	}
+	RespSuccess(c, list)
+}

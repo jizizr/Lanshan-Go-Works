@@ -51,8 +51,8 @@ func AddUser(user *model.User) error {
 }
 
 // QueryPwd 查询密码
-func QueryPwd(username string) (int, string, error) {
-	var uid int
+func QueryPwd(username string) (int64, string, error) {
+	var uid int64
 	var pwd string
 	err := db.QueryRow(QueryPwdStr, username).Scan(&uid, &pwd)
 	if err != nil {

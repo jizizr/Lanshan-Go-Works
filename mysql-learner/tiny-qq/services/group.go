@@ -12,17 +12,22 @@ func CreateGroup(param *model.ParamGroup) (int64, error) {
 	return mysql.CreateGroup(param)
 }
 
-// DeleteGroup TODO: 清理 UserGroupRelations 表中的数据
+func QueryGroupCreator(gid int64) (int64, error) {
+	if err := mysql.CheckGroup(gid); err == nil {
+		return 0, mysql.ErrorGroupNotExist
+	}
+	return mysql.QueryGroupCreator(gid)
+}
+
 func DeleteGroup(param *model.ParamGroupID) error {
-	if err := mysql.CheckGroup(param); err == nil {
+	if err := mysql.CheckGroup(param.GroupID); err == nil {
 		return mysql.ErrorGroupNotExist
 	}
 	return mysql.DeleteGroup(param)
 }
 
 func AddGroupUser(param *model.ParamModifyGroupUser) (int64, error) {
-	p := &model.ParamGroupID{GroupID: param.GroupID}
-	if err := mysql.CheckGroup(p); err == nil {
+	if err := mysql.CheckGroup(param.GroupID); err == nil {
 		return 0, mysql.ErrorGroupNotExist
 	} else if err := mysql.CheckGroupUser(param); err != nil {
 		return 0, err
@@ -31,8 +36,7 @@ func AddGroupUser(param *model.ParamModifyGroupUser) (int64, error) {
 }
 
 func DeleteGroupUser(param *model.ParamModifyGroupUser) error {
-	p := &model.ParamGroupID{GroupID: param.GroupID}
-	if err := mysql.CheckGroup(p); err == nil {
+	if err := mysql.CheckGroup(param.GroupID); err == nil {
 		return mysql.ErrorGroupNotExist
 	} else if err := mysql.CheckGroupUser(param); err == nil {
 		return mysql.ErrorGroupUserNotExist
@@ -41,7 +45,7 @@ func DeleteGroupUser(param *model.ParamModifyGroupUser) error {
 }
 
 func QueryGroupsList(param *model.ParamGroupID) ([]*model.UserFriend, error) {
-	if err := mysql.CheckGroup(param); err == nil {
+	if err := mysql.CheckGroup(param.GroupID); err == nil {
 		return nil, mysql.ErrorGroupNotExist
 	}
 	return mysql.QueryGroupUser(param)

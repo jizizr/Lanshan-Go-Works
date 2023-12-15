@@ -27,8 +27,7 @@ func InitRouters() {
 		private.GET("/group", controller.QueryGroupsList)
 		private.POST("/grouper", controller.AddGroupUser)
 		private.DELETE("/grouper", controller.DeleteGroupUser)
-		//TODO: 模糊搜索好友
-		//private.Post("/search", controller.SearchFriends)
+		private.GET("/search", controller.SearchFriend)
 	}
 
 	r.Run(":8080")

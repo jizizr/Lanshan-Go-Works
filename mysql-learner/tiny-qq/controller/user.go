@@ -49,7 +49,7 @@ func Login(c *gin.Context) {
 	var (
 		token string
 		err   error
-		uid   int
+		uid   int64
 	)
 	uid, token, err = services.Login(ParamUser)
 	//判断错误类型

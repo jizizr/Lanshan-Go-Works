@@ -16,7 +16,10 @@ func DeleteFriend(param *model.ParamModifyFriend) error {
 	return mysql.DeleteFriend(param)
 }
 
-// QueryFriendsList TODO: 验证用户查询权限
-func QueryFriendsList(uid int) ([]model.UserFriend, error) {
+func QueryFriendsList(uid int64) ([]model.UserFriend, error) {
 	return mysql.QueryFriendsList(uid)
+}
+
+func SearchFriend(uid int64, username string) ([]*model.UserFriend, error) {
+	return mysql.SearchFriend(uid, username)
 }

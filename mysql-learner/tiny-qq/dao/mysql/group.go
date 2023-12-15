@@ -6,14 +6,16 @@ import (
 )
 
 const (
-	IfGroupExistStr     = "SELECT EXISTS(SELECT 1 FROM FriendGroups WHERE GroupID = ?);"
-	IfGroupNameExistStr = "SELECT EXISTS(SELECT 1 FROM FriendGroups WHERE UserID = ? AND GroupName = ?);"
-	CreateGroupStr      = "INSERT INTO FriendGroups(GroupName,UserID) VALUES(?,?);"
-	DeleteGroupStr      = "DELETE FROM FriendGroups WHERE GroupID = ?;"
-	IfGroupUserExistStr = "SELECT EXISTS(SELECT 1 FROM UserGroupRelations WHERE UserID = ? AND GroupID = ?);"
-	AddGroupUserStr     = "INSERT INTO UserGroupRelations(UserID,GroupID) VALUES(?,?);"
-	DeleteGroupUserStr  = "DELETE FROM UserGroupRelations WHERE UserID = ? AND GroupID = ?;"
-	QueryGroupUserStr   = `
+	IfGroupExistStr       = "SELECT EXISTS(SELECT 1 FROM FriendGroups WHERE GroupID = ?);"
+	IfGroupNameExistStr   = "SELECT EXISTS(SELECT 1 FROM FriendGroups WHERE UserID = ? AND GroupName = ?);"
+	CreateGroupStr        = "INSERT INTO FriendGroups(GroupName,UserID) VALUES(?,?);"
+	QueryGroupCreatorStr  = "SELECT UserID FROM FriendGroups WHERE GroupID = ?;"
+	DeleteGroupStr        = "DELETE FROM FriendGroups WHERE GroupID = ?;"
+	IfGroupUserExistStr   = "SELECT EXISTS(SELECT 1 FROM UserGroupRelations WHERE UserID = ? AND GroupID = ?);"
+	AddGroupUserStr       = "INSERT INTO UserGroupRelations(UserID,GroupID) VALUES(?,?);"
+	DeleteGroupUserStr    = "DELETE FROM UserGroupRelations WHERE UserID = ? AND GroupID = ?;"
+	DeleteGroupAllUserStr = "DELETE FROM UserGroupRelations WHERE GroupID = ?;"
+	QueryGroupUserStr     = `
 		SELECT 
 			Users.UserID,
 			Users.Username
@@ -31,9 +33,9 @@ const (
 // CheckGroup 检查群组是否已存在
 // 如果存在返回ErrorGroupExist
 // 如果不存在返回nil
-func CheckGroup(param *model.ParamGroupID) error {
+func CheckGroup(gid int64) error {
 	var exists bool
-	err := db.QueryRow(IfGroupExistStr, param.GroupID).Scan(&exists)
+	err := db.QueryRow(IfGroupExistStr, gid).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -58,6 +60,16 @@ func CheckGroupName(param *model.ParamGroup) error {
 	return nil
 }
 
+// QueryGroupCreator 查询分组创建者
+func QueryGroupCreator(gid int64) (int64, error) {
+	var creator int64
+	err := db.QueryRow(QueryGroupCreatorStr, gid).Scan(&creator)
+	if err != nil {
+		return 0, err
+	}
+	return creator, nil
+}
+
 // CreateGroup 创建群组
 func CreateGroup(param *model.ParamGroup) (int64, error) {
 	result, err := db.Exec(CreateGroupStr, param.GroupName, param.UserID)
@@ -69,8 +81,21 @@ func CreateGroup(param *model.ParamGroup) (int64, error) {
 
 // DeleteGroup 删除群组
 func DeleteGroup(param *model.ParamGroupID) error {
-	_, err := db.Exec(DeleteGroupStr, param.GroupID)
-	return err
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	// 先删除分组中的所有用户关系
+	if _, err := tx.Exec(DeleteGroupAllUserStr, param.GroupID); err != nil {
+		tx.Rollback()
+		return err
+	}
+	// 然后删除分组本身
+	if _, err := tx.Exec(DeleteGroupStr, param.GroupID); err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // CheckGroupUser 检查群组用户是否已存在

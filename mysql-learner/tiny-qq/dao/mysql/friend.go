@@ -14,6 +14,12 @@ const (
         FROM Users u
         JOIN (SELECT FriendID FROM Friends WHERE UserID = ?) AS f ON u.UserID = f.FriendID
     `
+	SearchFriendStr = `
+		SELECT u.UserID, u.Username
+		FROM Users u 
+		JOIN Friends ON u.UserID = Friends.FriendID 
+		WHERE Friends.UserID = ? AND u.Username LIKE CONCAT('%', ?, '%');
+`
 )
 
 // CheckFriend 检查好友是否已存在
@@ -45,7 +51,7 @@ func DeleteFriend(param *model.ParamModifyFriend) error {
 }
 
 // QueryFriendsList 查询好友列表
-func QueryFriendsList(uid int) ([]model.UserFriend, error) {
+func QueryFriendsList(uid int64) ([]model.UserFriend, error) {
 	rows, err := db.Query(QueryFriendsListStr, uid)
 	if err != nil {
 		return nil, err
@@ -54,6 +60,24 @@ func QueryFriendsList(uid int) ([]model.UserFriend, error) {
 	var users []model.UserFriend
 	for rows.Next() {
 		var user model.UserFriend
+		if err := rows.Scan(&user.UserID, &user.Username); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+// SearchFriend 搜索好友
+func SearchFriend(uid int64, username string) ([]*model.UserFriend, error) {
+	rows, err := db.Query(SearchFriendStr, uid, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []*model.UserFriend
+	for rows.Next() {
+		user := new(model.UserFriend)
 		if err := rows.Scan(&user.UserID, &user.Username); err != nil {
 			return nil, err
 		}

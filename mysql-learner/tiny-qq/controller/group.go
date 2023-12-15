@@ -144,6 +144,20 @@ func QueryGroupsList(c *gin.Context) {
 		RespFailed(c, CodeInvalidParam)
 		return
 	}
+	uid, _ := utils.GetUid(c)
+	if creator, err := services.QueryGroupCreator(param.GroupID); err != nil {
+		if errors.Is(err, mysql.ErrorGroupNotExist) {
+			RespFailed(c, CodeGroupNotExist)
+			return
+		} else {
+			RespFailed(c, CodeServiceBusy)
+			log.Println(err)
+			return
+		}
+	} else if creator != uid {
+		RespFailed(c, CodeInvalidUser)
+		return
+	}
 	if userList, err := services.QueryGroupsList(param); err != nil {
 		if errors.Is(err, mysql.ErrorGroupNotExist) {
 			RespFailed(c, CodeGroupNotExist)

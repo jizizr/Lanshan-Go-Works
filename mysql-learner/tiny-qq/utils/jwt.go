@@ -11,11 +11,11 @@ const tokenExpireDuration = time.Hour * 24 * 7
 const secretKey = "REDROCK114514"
 
 type MyClaims struct {
-	Uid int
+	Uid int64
 	jwt.RegisteredClaims
 }
 
-func GenToken(uid int) (string, error) {
+func GenToken(uid int64) (string, error) {
 	claim := MyClaims{
 		Uid: uid,
 		RegisteredClaims: jwt.RegisteredClaims{

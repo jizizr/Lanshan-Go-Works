@@ -5,12 +5,12 @@ import (
 	"tiny-qq/model"
 )
 
-func GetUid(c *gin.Context) (UserID int, ok bool) {
+func GetUid(c *gin.Context) (UserID int64, ok bool) {
 	uid, ok := c.Get(model.CtxGetUID)
 	if !ok {
 		return
 	}
-	UserID, ok = uid.(int)
+	UserID, ok = uid.(int64)
 	if !ok {
 		return
 	}
